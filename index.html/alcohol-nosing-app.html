@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diageo Sensory Analysis Results</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h2 {
+      color: #003366;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    /* Logo */
+    #logo {
+      display: block;
+      margin: 0 auto 20px auto;
+      max-width: 150px;
+    }
+
+    /* Card styling */
+    .card {
+      background-color: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      box-shadow: 0px 3px 10px rgba(0,0,0,0.1);
+    }
+
+    /* Form inputs */
+    input, select {
+      display: block;
+      margin-bottom: 15px;
+      padding: 10px;
+      width: 100%;
+      max-width: 300px;
+      border-radius: 5px;
+      border: 1px solid #ccc; /* normal border */
+      box-sizing: border-box;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin-top: 10px;
+      background-color: #003366;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #0055a5;
+    }
+
+    /* Tables */
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      background-color: white;
+    }
+
+    table, th, td {
+      border: 1px solid #ccc; /* normal table border */
+    }
+
+    th, td {
+      padding: 10px;
+      text-align: center;
+    }
+
+    /* PASS/FAIL highlights */
+    .pass {
+      color: green;
+      background-color: #e0ffe0;
+      font-weight: bold;
+    }
+
+    .fail {
+      color: red;
+      background-color: #ffe0e0;
+      font-weight: bold;
+    }
+
+    /* Scoring guide table */
+    table.scoring-guide th, table.scoring-guide td {
+      text-align: center;
+    }
+
+    /* Center QA login */
+    #qa-login-div {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    /* SKU count */
+    #sku-count p {
+      margin: 5px 0;
+    }
+
+    /* Export button */
+    #export-btn {
+      margin-top: 15px;
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      input, select {
+        width: 100%;
+      }
+      table {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Logo -->
+  <img id="logo" src="file:///C:/Users/Ayanda/OneDrive/Desktop/AlcoholNosingApp/icon.png" alt="Diageo Logo">
+
+  <h2>Diageo Sensory Analysis Results</h2>
+
+  <!-- QA Login -->
+  <div id="qa-login-div" class="card">
+    <button onclick="qaLogin()">QA Login</button>
+  </div>
+
+  <!-- Submission Form -->
+  <div class="card">
+    <form id="nosing-form">
+      <label>Analyst Name</label>
+      <input type="text" name="analyst" required>
+
+      <label>Batch Number</label>
+      <input type="text" name="batchNumber" required>
+
+      <label>Product</label>
+      <input type="text" name="product" required>
+
+      <label>Test Date</label>
+      <input type="date" name="date" required>
+
+      <label>Alcohol %</label>
+      <input type="number" name="alcohol" required min="0">
+
+      <label>Nosing Score (8-10)</label>
+      <input type="number" name="nosingScore" min="8" max="10" value="9" required>
+
+      <label>Visual Colour Score (8-10)</label>
+      <input type="number" name="visualScore" min="8" max="10" value="9" required>
+
+      <button type="button" onclick="submitResult()">Submit Results</button>
+    </form>
+  </div>
+
+  <!-- Scoring guide -->
+  <div class="card">
+    <h3>Scoring Guide (Visible to all Analysts)</h3>
+    <table class="scoring-guide">
+      <thead>
+        <tr>
+          <th>Score</th>
+          <th>Meaning</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>10</td>
+          <td>Pass – Same as standard</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td>Pass – Acceptable</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td>Fail – Poor</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SKU Submission Count -->
+  <div class="card">
+    <h3>Batch Submission Count</h3>
+    <div id="sku-count"></div>
+  </div>
+
+  <!-- Results Table (QA only) -->
+  <div class="card">
+    <h3>Submitted Results (QA Only)</h3>
+    <table id="results-table">
+      <thead>
+        <tr>
+          <th>Analyst</th>
+          <th>Batch Number</th>
+          <th>Product</th>
+          <th>Date</th>
+          <th>Alcohol %</th>
+          <th>Nosing</th>
+          <th>Visual</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <button id="export-btn" onclick="exportExcel()" style="display:none;">Export to Excel</button>
+  </div>
+
+  <!-- XLSX library -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <script>
+    let records = [];
+    let isQA = false;
+
+    function saveRecords() { localStorage.setItem("nosingRecords", JSON.stringify(records)); }
+    function loadRecords() {
+      const saved = localStorage.getItem("nosingRecords");
+      if(saved) records = JSON.parse(saved);
+      removeExpiredRecords();
+      updateSKUCount();
+      if(isQA) renderTable();
+    }
+
+    function qaLogin() {
+      const username = prompt("Username");
+      const password = prompt("Password");
+      if(username === "QA" && password === "qa2026") {
+        isQA = true;
+        document.getElementById("qa-login-div").style.display = "none";
+        document.getElementById("export-btn").style.display = "inline-block";
+        renderTable();
+      } else { alert("Invalid QA login"); }
+    }
+
+    function submitResult() {
+      const form = document.getElementById("nosing-form");
+      const analyst = form.analyst.value.trim();
+      const batchNumber = form.batchNumber.value.trim();
+      const product = form.product.value.trim();
+      const date = form.date.value;
+      const alcohol = form.alcohol.value;
+      const nosingScore = parseInt(form.nosingScore.value);
+      const visualScore = parseInt(form.visualScore.value);
+
+      if(!analyst || !batchNumber || !product || !date || !alcohol || !nosingScore || !visualScore) {
+        alert("Complete all fields"); return;
+      }
+
+      removeExpiredRecords();
+
+      const batchRecords = records.filter(r => r.batchNumber === batchNumber);
+      if(batchRecords.length >= 4) {
+        alert(`Batch ${batchNumber} already has 4 submissions.`);
+        return;
+      }
+
+      const status = (nosingScore === 8 || visualScore === 8) ? "FAIL" : "PASS";
+      const timestamp = new Date().getTime();
+
+      const record = { analyst, batchNumber, product, date, alcohol, nosingScore, visualScore, status, timestamp };
+      records.push(record);
+      saveRecords();
+
+      updateSKUCount();
+      if(isQA) renderTable();
+
+      form.reset();
+      form.nosingScore.value = 9;
+      form.visualScore.value = 9;
+
+      alert("Result submitted successfully");
+    }
+
+    function updateSKUCount() {
+      const div = document.getElementById("sku-count");
+      div.innerHTML = "";
+      const batchMap = {};
+      const now = new Date().getTime();
+      records.forEach(r => {
+        const batchRecords = records.filter(x => x.batchNumber === r.batchNumber);
+        const fourth = batchRecords[3];
+        if(fourth && now - fourth.timestamp > 24*60*60*1000) return;
+        batchMap[r.batchNumber] = (batchMap[r.batchNumber] || 0) + 1;
+      });
+      for(const batch in batchMap) {
+        div.innerHTML += `<p>Batch ${batch}: ${batchMap[batch]} / 4 submissions</p>`;
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("results-table").getElementsByTagName("tbody")[0];
+      tbody.innerHTML = "";
+      const now = new Date().getTime();
+      const batches = {};
+      records.forEach(r => {
+        const batchRecords = batches[r.batchNumber] || [];
+        if(batchRecords.length < 4) {
+          const allBatch = records.filter(x => x.batchNumber === r.batchNumber);
+          const fourth = allBatch[3];
+          if(fourth && now - fourth.timestamp > 24*60*60*1000) return;
+          batchRecords.push(r);
+        }
+        batches[r.batchNumber] = batchRecords;
+      });
+      for(const batch in batches) {
+        batches[batch].forEach(r => addRow(r));
+      }
+    }
+
+    function addRow(r) {
+      const tbody = document.getElementById("results-table").getElementsByTagName("tbody")[0];
+      const tr = document.createElement("tr");
+      tr.className = (r.status === "PASS") ? "pass" : "fail";
+      tr.innerHTML = `<td>${r.analyst}</td>
+                      <td>${r.batchNumber}</td>
+                      <td>${r.product}</td>
+                      <td>${r.date}</td>
+                      <td>${r.alcohol}</td>
+                      <td>${r.nosingScore}</td>
+                      <td>${r.visualScore}</td>
+                      <td>${r.status}</td>`;
+      tbody.appendChild(tr);
+    }
+
+    function removeExpiredRecords() {
+      const now = new Date().getTime();
+      const validRecords = [];
+      const batchMap = {};
+      records.forEach(r => {
+        const batchRecords = batchMap[r.batchNumber] || [];
+        batchRecords.push(r);
+        batchMap[r.batchNumber] = batchRecords;
+      });
+      for(const batch in batchMap) {
+        const batchRecords = batchMap[batch];
+        const fourth = batchRecords[3];
+        if(fourth) {
+          if(now - fourth.timestamp <= 24*60*60*1000) {
+            validRecords.push(...batchRecords);
+          }
+        } else {
+          validRecords.push(...batchRecords);
+        }
+      }
+      records = validRecords;
+      saveRecords();
+    }
+
+    function exportExcel() {
+      if(!isQA) return;
+      const ws = XLSX.utils.json_to_sheet(records);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Results");
+      XLSX.writeFile(wb, "AlcoholResults.xlsx");
+    }
+
+    window.onload = function() {
+      loadRecords();
+    }
+  </script>
+
+</body>
+</html>
